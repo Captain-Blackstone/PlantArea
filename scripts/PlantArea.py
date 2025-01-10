@@ -76,7 +76,7 @@ def calculate_green_percentage(image_path):
         if prev_y is not None and abs(y - prev_y) >= threshold:
             current_row += 1
             current_column = 0
-        else:
+        elif prev_y is not None:
             current_column += 1
         prev_y = y
         results.append([Path(*image_path.parts[-2:]), current_row, current_column, percentage, f"{i+1}/{len(percentages)}"])
@@ -116,10 +116,10 @@ def process_images_in_folder(folder_path, output_csv):
 if __name__ == "__main__":
     # Command-line interface
     parser = argparse.ArgumentParser(description="Calculate green area percentage in grid boxes for all images in a folder.")
-    parser.add_argument("--folder_path", type=str, help="Path to the folder containing images.")
-    parser.add_argument("--output_csv", type=str, help="Path to the output CSV file.")
+    parser.add_argument("--input_folder_path", type=str, help="Path to the folder containing images.")
+    parser.add_argument("--output_csv_path", type=str, help="Path to the output CSV file.")
 
     args = parser.parse_args()
 
     # Run the processing function
-    process_images_in_folder(args.folder_path, args.output_csv)
+    process_images_in_folder(args.input_folder_path, args.output_csv_path)
