@@ -6,7 +6,7 @@ This is a script measuring the area filled by plants in boxes. It takes images a
 
 
 ```bash
-git clone []
+git clone https://github.com/Captain-Blackstone/PlantArea.git
 cd PlantArea
 pip3 install -r requirements.txt 
 ```
