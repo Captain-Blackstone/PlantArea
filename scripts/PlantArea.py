@@ -102,7 +102,7 @@ def process_images_in_folder(folder_path, output_csv):
     
     # Save all results to a single CSV file
     if all_results:
-        columns = ["filename", "row", "column", "percentage", "box#"]
+        columns = ["filename", "column", "row", "percentage", "box#"]
         df = pd.DataFrame(all_results, columns=columns)
         df.to_csv(output_csv, index=False)
         print(f"Results saved to {output_csv}")
