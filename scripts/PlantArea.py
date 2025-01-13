@@ -14,6 +14,7 @@ def calculate_green_percentage(image_path):
     Calculate green percentage for an individual image.
     Returns a list of results for each box in the grid.
     """
+    short_path = Path(*image_path.parts[-2:])
     # Load the image
     image = cv2.imread(str(image_path))
     if image is None:
@@ -50,12 +51,19 @@ def calculate_green_percentage(image_path):
         approx = cv2.approxPolyDP(contour, epsilon, True)
         if len(approx) > 0:
             x, y, w, h = cv2.boundingRect(approx)
-            grid_rectangles.append((x, y, w, h))
-    grid_rectangles = sorted(grid_rectangles, key=lambda r: (r[1], r[0]))
-
+            if abs(w/h - 1) < 0.1:
+                grid_rectangles.append((x, y, w, h))
+            elif abs(w/h - 2) < 0.1: # width approximately twice as big as height
+                grid_rectangles.append((x, y, w//2, h))
+                grid_rectangles.append((x+w/2, y, w//2, h))
+            elif abs(w/h - 0.5) < 0.1: # height approximately twice as big as width
+                grid_rectangles.append((x, y, w, h//2))
+                grid_rectangles.append((x, y+h//2, w, h//2))
+                    
+    grid_rectangles = sorted(grid_rectangles, key=lambda r: (round(r[1]/r[3]), round(r[0]/r[2])))
     # Calculate green percentage for each box
-    percentages = []
-    for rect in grid_rectangles:
+    results = []
+    for i, rect in enumerate(grid_rectangles):
         x, y, w, h = rect
         box = image[y:y+h, x:x+w]
         hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
@@ -63,24 +71,12 @@ def calculate_green_percentage(image_path):
         total_pixels = w * h
         green_pixels = cv2.countNonZero(green_mask)
         green_percentage = (green_pixels / total_pixels) * 100
-        percentages.append((x, y, green_percentage))
-
-    # Determine grid rows and columns
-    results = []
-    current_row = 0
-    current_column = 0
-    threshold = max(rect[3] for rect in grid_rectangles) * 0.5 if grid_rectangles else 0
-    prev_y = None
-
-    for i, (x, y, percentage) in enumerate(percentages):
-        if prev_y is not None and abs(y - prev_y) >= threshold:
-            current_row += 1
-            current_column = 0
-        elif prev_y is not None:
-            current_column += 1
-        prev_y = y
-        results.append([Path(*image_path.parts[-2:]), current_row, current_column, percentage, f"{i+1}/{len(percentages)}"])
+        results.append((short_path, round(x/w), round(y/h), green_percentage, f"{i+1}/{len(grid_rectangles)}"))
+    coords = [el[:3] for el in results]
+    if len(set(coords)) != len(coords):
+        print(f"{short_path} coordinates detected incorrectly, check manually...", end=" ")
     return results
+
 
 def process_images_in_folder(folder_path, output_csv):
     """

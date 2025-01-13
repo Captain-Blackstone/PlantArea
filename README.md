@@ -22,11 +22,11 @@ To test the installation you can run the example:
 python3 scripts/PlantArea.py --input_folder_path ./images/ --output_csv_path ./test.csv
 ```
 
-A file called "test.csv" is supposed to appear and have the following contents:
+A file called "test.csv" is supposed to appear and have the following contents: 
 filename,row,column,percentage,box#
-images/1001.jpg,0,0,3.2073001694132146,1/4
-images/1001.jpg,0,1,2.87357114104692,2/4
-images/1001.jpg,1,0,13.658094068626776,3/4
+images/1001.jpg,0,0,2.87357114104692,1/4
+images/1001.jpg,1,0,3.2073001694132146,2/4
+images/1001.jpg,0,1,13.658094068626776,3/4
 images/1001.jpg,1,1,12.268328570215896,4/4
 
 filename: [parent directory]/[name of the processed file]
