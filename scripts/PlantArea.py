@@ -93,7 +93,6 @@ def calculate_green_percentage(image_path, binary_folder):
     visualization[plant_mask > 0] = 255
     cv2.imwrite(str(binary_folder / f"{short_path.stem}_detection.png"), visualization)
     ###
-
     return results
 
 
@@ -113,7 +112,7 @@ def process_images_in_folder(input_folder, output_folder):
     for image_path in folder_path.glob("*"):
         if image_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
             print(f"Processing image: {image_path}...", end=" ")
-            results = calculate_green_percentage(image_path, output_folder / "visualization_images")
+            results = calculate_green_percentage(image_path, output_folder / "detection_vizualisations")
             all_results.extend(results)
             print(f"detected {len(results)} boxes.")
         else:
@@ -147,7 +146,6 @@ def main():
     
     # Process images
     input_folder = Path(args.input_folder)
-    # Save results to CSV
     process_images_in_folder(input_folder, output_folder)
 
 if __name__ == "__main__":
