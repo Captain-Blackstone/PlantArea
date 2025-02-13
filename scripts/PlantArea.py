@@ -122,7 +122,7 @@ def process_images_in_folder(input_folder, output_folder):
     if all_results:
         columns = ["filename", "column", "row", "percentage", "box#"]
         df = pd.DataFrame(all_results, columns=columns)
-        df.to_csv(output_csv, index=False)
+        df.to_csv(output_csv, index=False, sep="\t")
         print(f"Results saved to {output_csv}")
     else:
         print("No valid images were found in the folder.")
