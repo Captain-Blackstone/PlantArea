@@ -81,13 +81,12 @@ def calculate_green_percentage(image_path, binary_folder):
         if element[4] == "circle":
             x, y, r = element[:3]
             box = image[max(0, y-r):min(y+r, image.shape[0]), max(0, x-r):min(x+r, image.shape[1])]
-            print(x, y, r, box.shape)
             hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
             green_mask = cv2.inRange(hsv, lower_green, upper_green)
             total_pixels = np.pi * r**2
             green_pixels = cv2.countNonZero(green_mask)
             green_percentage = (green_pixels / total_pixels) * 100
-            results.append((short_path, round(x/r), round(y/r), green_percentage, f"{i+1}/{len(grid_elements)}"))
+            results.append((short_path, round((x-r)/(2*r)), round((y-r)/(2*r)), green_percentage, f"{i+1}/{len(grid_elements)}"))
         elif element[4] == "square":
             x, y, w, h  = element[:4]
             box = image[y:y+h, x:x+w]
@@ -136,7 +135,14 @@ def calculate_green_percentage(image_path, binary_folder):
     visualization[plant_mask > 0] = 255
     cv2.imwrite(str(binary_folder / f"{short_path.stem}_detection.png"), visualization)
     ###
-    return (results, 
+    # Convert results to dataframe
+    df = pd.DataFrame(results, columns=["filename", "column", "row", "percentage", "box#"])
+    
+    # Replace column and row coordinates with their ranks
+    df["column"] = df["column"].rank(method="dense").astype(int) - 1
+    df["row"] = df["row"].rank(method="dense").astype(int) - 1
+
+    return (df, 
             len(list(filter(lambda x: x[4] == "circle", grid_elements))), 
             len(list(filter(lambda x: x[4] == "square", grid_elements))))
 
@@ -158,7 +164,7 @@ def process_images_in_folder(input_folder, output_folder):
         if image_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
             print(f"Processing image: {image_path}...", end=" ")
             results, circular_count, square_count = calculate_green_percentage(image_path, output_folder / "detection_vizualisations")
-            all_results.extend(results)
+            all_results.append(results)
             print("detected ", end=" ")
             if circular_count > 0:
                 print(f"{circular_count} circular", end=" ")
@@ -172,9 +178,7 @@ def process_images_in_folder(input_folder, output_folder):
     
     # Save all results to a single CSV file
     if all_results:
-        columns = ["filename", "column", "row", "percentage", "box#"]
-        df = pd.DataFrame(all_results, columns=columns)
-        df.to_csv(output_csv, index=False, sep="\t")
+        pd.concat(all_results).to_csv(output_csv, index=False, sep="\t")
         print(f"Results saved to {output_csv}")
     else:
         print("No valid images were found in the folder.")
