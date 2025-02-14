@@ -24,7 +24,7 @@ python3 scripts/PlantArea.py --input_folder ./images/ --output_folder testOut
 
 A folder called "testOut" is supposed to appear and contain a subfolder with detection visualization and the table areas.tsv with the following content: 
 ```
-filename,column,row,percentage,box#
+filename        column  row     percentage      box#
 images/rectangular_plates.jpg	0	0	2.87357114104692	1/4
 images/rectangular_plates.jpg	1	0	3.2073001694132146	2/4
 images/rectangular_plates.jpg	0	1	13.658094068626776	3/4
