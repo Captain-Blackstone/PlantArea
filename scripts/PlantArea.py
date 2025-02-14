@@ -44,35 +44,59 @@ def calculate_green_percentage(image_path, binary_folder):
         valid_contours = []
         for pos in np.where(labels == np.argmax(centers))[0]:
             valid_contours.append(contours[pos])
-    grid_rectangles = []
+    grid_elements = []
     for contour in valid_contours:
         # Approximate contour to polygon
         epsilon = 0.02 * cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, epsilon, True)
         if len(approx) > 0:
+            # Check if contour is better approximated by a circle
+            # Calculate areas of contour, circle and rectangle
+            contour_area = cv2.contourArea(contour)
+            (x_circle, y_circle), radius = cv2.minEnclosingCircle(contour)
+            circle_area = np.pi * radius**2
             x, y, w, h = cv2.boundingRect(approx)
-            if abs(w/h - 1) < 0.1:
-                grid_rectangles.append((x, y, w, h))
-            elif abs(w/h - 2) < 0.1: # width approximately twice as big as height
-                grid_rectangles.append((x, y, w//2, h))
-                grid_rectangles.append((x+w//2, y, w//2, h))
-            elif abs(w/h - 0.5) < 0.1: # height approximately twice as big as width
-                grid_rectangles.append((x, y, w, h//2))
-                grid_rectangles.append((x, y+h//2, w, h//2))
+            rect_area = w * h
+            
+            # Compare which shape is closer to contour area
+            circle_diff = abs(circle_area - contour_area)
+            rect_diff = abs(rect_area - contour_area)
+            if circle_diff < rect_diff:  # Circle is a better fit
+                grid_elements.append([int(x_circle), int(y_circle), int(radius), int(radius), "circle"])  # Skip this contour as we can't properly process circular boxes
             else:
-                print(f"Warning: {short_path} has a box with an aspect ratio of {w/h}")
-    grid_rectangles = sorted(grid_rectangles, key=lambda r: (round(r[1]/r[3]), round(r[0]/r[2])))
+                if abs(w/h - 1) < 0.1:
+                    grid_elements.append((x, y, w, h, "square"))
+                elif abs(w/h - 2) < 0.1: # width approximately twice as big as height
+                    grid_elements.append((x, y, w//2, h, "square"))
+                    grid_elements.append((x+w//2, y, w//2, h, "square"))
+                elif abs(w/h - 0.5) < 0.1: # height approximately twice as big as width
+                    grid_elements.append((x, y, w, h//2, "square"))
+                    grid_elements.append((x, y+h//2, w, h//2, "square"))
+                else:
+                    print(f"Warning: {short_path} has a box with an aspect ratio of {w/h}")
+    grid_elements = sorted(grid_elements, key=lambda r: (round(r[1]/r[3]), round(r[0]/r[2])))
     # Calculate green percentage for each box
     results = []
-    for i, rect in enumerate(grid_rectangles):
-        x, y, w, h = rect
-        box = image[y:y+h, x:x+w]
-        hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
-        green_mask = cv2.inRange(hsv, lower_green, upper_green)
-        total_pixels = w * h
-        green_pixels = cv2.countNonZero(green_mask)
-        green_percentage = (green_pixels / total_pixels) * 100
-        results.append((short_path, round(x/w), round(y/h), green_percentage, f"{i+1}/{len(grid_rectangles)}"))
+    for i, element in enumerate(grid_elements):
+        if element[4] == "circle":
+            x, y, r = element[:3]
+            box = image[max(0, y-r):min(y+r, image.shape[0]), max(0, x-r):min(x+r, image.shape[1])]
+            print(x, y, r, box.shape)
+            hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
+            green_mask = cv2.inRange(hsv, lower_green, upper_green)
+            total_pixels = np.pi * r**2
+            green_pixels = cv2.countNonZero(green_mask)
+            green_percentage = (green_pixels / total_pixels) * 100
+            results.append((short_path, round(x/r), round(y/r), green_percentage, f"{i+1}/{len(grid_elements)}"))
+        elif element[4] == "square":
+            x, y, w, h  = element[:4]
+            box = image[y:y+h, x:x+w]
+            hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
+            green_mask = cv2.inRange(hsv, lower_green, upper_green)
+            total_pixels = w * h
+            green_pixels = cv2.countNonZero(green_mask)
+            green_percentage = (green_pixels / total_pixels) * 100
+            results.append((short_path, round(x/w), round(y/h), green_percentage, f"{i+1}/{len(grid_elements)}"))
     coords = [el[:3] for el in results]
     if len(set(coords)) != len(coords):
         print(f"{short_path} coordinates detected incorrectly, check manually...", end=" ")
@@ -81,19 +105,40 @@ def calculate_green_percentage(image_path, binary_folder):
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     plant_mask = cv2.inRange(hsv, lower_green, upper_green)
     box_mask = np.zeros_like(image)
-    for i, rect in enumerate(grid_rectangles):
-        x, y, w, h = rect
-        box_mask[y:y+h, x:x+w] = 1
-        box_mask[y-10:y, x:x+w] = 0
-        box_mask[y+h:y+h+10, x:x+w] = 0
-        box_mask[y:y+h, x-10:x] = 0
-        box_mask[y:y+h, x+w:x+w+10] = 0
+    for i, element in enumerate(grid_elements):
+        if element[4] == "circle":
+            x, y, r = element[:3]
+            # Create a circular mask
+            Y, X = np.ogrid[:image.shape[0], :image.shape[1]]
+            dist_from_center = np.sqrt((X - x)**2 + (Y - y)**2)
+            circle_mask = dist_from_center <= r
+            box_mask[circle_mask] = 1
+            # Add border by removing 10px ring around circle
+            outer_ring = (dist_from_center <= r+10) & (dist_from_center > r)
+            box_mask[outer_ring] = 0
+        elif element[4] == "square":
+            x, y, w, h = element[:4]
+            # Ensure indices are within bounds
+            y_start = max(y-10, 0)
+            y_end = min(y+h+10, box_mask.shape[0])
+            x_start = max(x-10, 0)
+            x_end = min(x+w+10, box_mask.shape[1])
+            
+            # Apply box mask with safe indices
+            box_mask[min(y, box_mask.shape[0]):min(y+h, box_mask.shape[0]), 
+                     min(x, box_mask.shape[1]):min(x+w, box_mask.shape[1])] = 1
+            box_mask[y_start:y, x:x+w] = 0  
+            box_mask[y+h:y_end, x:x+w] = 0  
+            box_mask[y:y+h, x_start:x] = 0  
+            box_mask[y:y+h, x+w:x_end] = 0  
     visualization = np.zeros_like(image)
     visualization[box_mask > 0] = 127
     visualization[plant_mask > 0] = 255
     cv2.imwrite(str(binary_folder / f"{short_path.stem}_detection.png"), visualization)
     ###
-    return results
+    return (results, 
+            len(list(filter(lambda x: x[4] == "circle", grid_elements))), 
+            len(list(filter(lambda x: x[4] == "square", grid_elements))))
 
 
 def process_images_in_folder(input_folder, output_folder):
@@ -112,9 +157,16 @@ def process_images_in_folder(input_folder, output_folder):
     for image_path in folder_path.glob("*"):
         if image_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
             print(f"Processing image: {image_path}...", end=" ")
-            results = calculate_green_percentage(image_path, output_folder / "detection_vizualisations")
+            results, circular_count, square_count = calculate_green_percentage(image_path, output_folder / "detection_vizualisations")
             all_results.extend(results)
-            print(f"detected {len(results)} boxes.")
+            print("detected ", end=" ")
+            if circular_count > 0:
+                print(f"{circular_count} circular", end=" ")
+            if square_count > 0 and circular_count > 0:
+                print("and", end=" ")
+            if square_count > 0:
+                print(f"{square_count} rectangular", end=" ")
+            print("boxes.")
         else:
             print(f"Skipping image: {image_path} (unsupported file extension)")
     
